@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const cookieSession = require('cookie-session');
+const createError = require('http-errors');
 
 const FeedbackService = require('./services/FeedbackService');
 const SpeakersService = require('./services/SpeakerService');
@@ -11,6 +12,8 @@ const speakersService = new SpeakersService('./data/speakers.json');
 const routes = require('./routes');
 
 const app = express();
+
+app.locals.siteName = 'ROUX Academy';
 
 const port = 3500;
 
@@ -31,9 +34,13 @@ app.locals.siteName = 'ROUX Meetups';
 app.use(express.static(path.join(__dirname, './static')));
 
 app.use(async (req, res, next) => {
-  const names = await speakersService.getNames();
-  res.locals.speakerNames = names;
-  return next;
+  try {
+    const names = await speakersService.getNames();
+    res.locals.speakerNames = names;
+    return next();
+  } catch (err) {
+    return next(err);
+  }
 });
 
 app.use(
@@ -43,6 +50,19 @@ app.use(
     speakersService,
   })
 );
+
+app.use((req, res, next) => {
+  return next(createError(404, 'File not found'));
+});
+
+app.use((err, req, res, next) => {
+  res.locals.message = err.message;
+  console.error(err);
+  const status = err.status || 500;
+  res.locals.status = status;
+  res.status(status);
+  res.render('error');
+});
 
 app.listen(port, () => {
   console.log(`Your express server is running on ${port}`);
